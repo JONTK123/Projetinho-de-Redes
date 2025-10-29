@@ -11,12 +11,9 @@ TYPE_DATA = 0
 TYPE_ACK = 1
 TYPE_NAK = 2
 
-# Formato do Cabeçalho: ! (network order), B (1 byte tipo), I (4 bytes checksum)
 HEADER_FMT = '!BI'
 HEADER_SIZE = struct.calcsize(HEADER_FMT)
 
-# Para o Teste 1: use 0.0
-# Para o Teste 2: use 0.3
 PROB_CORRUPCAO = 0.3
 
 
@@ -29,17 +26,10 @@ def make_data_pkt(data):
 def corrupt_packet(packet, prob):
     if random.random() < prob:
         print("[Simulação] Corrompendo pacote...")
-
-        # Escolhe um índice aleatório no pacote para inverter um bit
         idx = random.randint(0, len(packet) - 1)
-        # Pega o byte original
         original_byte = packet[idx]
-        # Escolhe um bit aleatório (0-7) para inverter
         bit_to_flip = 1 << random.randint(0, 7)
-        # Inverte o bit usando XOR
         corrupted_byte = original_byte ^ bit_to_flip
-
-        # Reconstrói o pacote com o byte corrompido
         pkt_list = list(packet)
         pkt_list[idx] = corrupted_byte
         return bytes(pkt_list)
@@ -48,20 +38,14 @@ def corrupt_packet(packet, prob):
 
 
 def unpack_feedback_pkt(packet):
-    """Desempacota um pacote de ACK/NAK."""
     header = packet[:HEADER_SIZE]
     pkt_type, _ = struct.unpack(HEADER_FMT, header)
     return pkt_type
 
 
 def main():
-    # Cria o socket UDP
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    # Associa o socket ao endereço do remetente
     sock.bind(SENDER_ADDR)
-
-    # RDT 2.0 não tem timeout, mas é uma boa prática ter um
-    # O remetente ficará bloqueado em recvfrom()
 
     messages = [f"Mensagem {i}" for i in range(1, 11)]
     retransmissions = 0
@@ -72,37 +56,36 @@ def main():
     for msg in messages:
         print(f"--- Enviando: '{msg}' ---")
 
-        # Cria o pacote de dados
-        sndpkt = make_data_pkt(msg.encode('utf-8'))
+        payload = msg.encode('utf-8')
+        sndpkt = make_data_pkt(payload)
 
-        # Loop "Stop-and-Wait" (FSM do RDT 2.0)
         while True:
-            # Corrompe o pacote artificialmente (ou não)
             pkt_to_send = corrupt_packet(sndpkt, PROB_CORRUPCAO)
+            was_corrupted = pkt_to_send != sndpkt
+            print(
+                f"[RDT2][TX] enviar len={len(payload)} header={HEADER_SIZE} total={len(pkt_to_send)} "
+                f"corrompido={'sim' if was_corrupted else 'nao'}"
+            )
 
-            # Envia o pacote
             sock.sendto(pkt_to_send, RECEIVER_ADDR)
-            print("Pacote enviado. Aguardando ACK/NAK...")
+            print("[RDT2][TX] enviado; aguardando ACK/NAK...")
 
             try:
-                # Espera bloqueado pela resposta
                 rcvpkt, addr = sock.recvfrom(1024)
 
-                # Desempacota o feedback
                 pkt_type = unpack_feedback_pkt(rcvpkt)
+                tipo = {TYPE_ACK: 'ACK', TYPE_NAK: 'NAK'}.get(pkt_type, f'DESCONHECIDO({pkt_type})')
+                print(f"[RDT2][RX] feedback tipo={tipo}")
 
                 if pkt_type == TYPE_NAK:
-                    print("NAK recebido. Retransmitindo...")
+                    print("[RDT2][RX] NAK recebido -> retransmitir mesmo pacote")
                     retransmissions += 1
-                    # O loop continua (retransmite)
 
                 elif pkt_type == TYPE_ACK:
-                    print("ACK recebido. Próxima mensagem.\n")
-                    # Sai do loop e vai para a próxima mensagem
+                    print("[RDT2][RX] ACK recebido -> avançar para próxima mensagem\n")
                     break
 
             except socket.timeout:
-                # Embora RDT 2.0 não preveja perda, se tivéssemos um timeout:
                 print("Timeout! (Não deveria acontecer no RDT 2.0). Retransmitindo...")
                 retransmissions += 1
 
