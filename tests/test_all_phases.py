@@ -182,8 +182,8 @@ def test_phase3():
     # Test TCP implementation
     tester.run_subprocess_test(
         "Phase 3 - TCP over UDP (handshake, data transfer, close)",
-        [sys.executable, "tcp/server.py"],
-        [sys.executable, "tcp/client.py"],
+        [sys.executable, "fase3/server.py"],
+        [sys.executable, "fase3/client.py"],
         timeout=20
     )
     
