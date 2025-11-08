@@ -1,5 +1,18 @@
 # Ignore the large textbook PDF
 Kurose Redes de Computadores e a Internet 8a.pdf
 
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
 
-Kurose Redes de Computadores e a Internet 8a.pdf
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
